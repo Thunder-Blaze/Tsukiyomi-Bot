@@ -75,6 +75,12 @@ async fn main() {
 
     let http_presence_map = Arc::clone(&presence_map);
 
+    let health_check = warp::path!("/")
+        .and(warp::get())
+        .map(|| {
+            println!("[HTTP GET /] Health check OK");
+            warp::reply::with_status("OK", warp::http::StatusCode::OK)
+        });
     let all_presences = {
         let presences = Arc::clone(&http_presence_map);
         warp::path!("presences")
@@ -107,7 +113,7 @@ async fn main() {
             }
         });
 
-    let routes = all_presences.or(presence_by_id);
+    let routes = health_check.or(all_presences).or(presence_by_id);
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let (addr, server) = warp::serve(routes)
         .bind_with_graceful_shutdown(([0, 0, 0, 0], 8080), async {
