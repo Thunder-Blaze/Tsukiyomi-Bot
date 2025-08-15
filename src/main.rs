@@ -57,6 +57,10 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
     let token = std::env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in the environment");
+    let port: u16 = std::env::var("PORT")
+        .unwrap_or_else(|_| "10000".to_string())
+        .parse()
+        .expect("PORT must be a valid u16");
 
     let presence_map: PresenceMap = Arc::new(DashMap::new());
     let handler = Handler {
@@ -75,7 +79,7 @@ async fn main() {
 
     let http_presence_map = Arc::clone(&presence_map);
 
-    let health_check = warp::path!("/")
+    let health_check = warp::path::end()
         .and(warp::get())
         .map(|| {
             println!("[HTTP GET /] Health check OK");
@@ -116,7 +120,7 @@ async fn main() {
     let routes = health_check.or(all_presences).or(presence_by_id);
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
     let (addr, server) = warp::serve(routes)
-        .bind_with_graceful_shutdown(([0, 0, 0, 0], 8080), async {
+        .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async {
             shutdown_rx.await.ok();
         });
     println!("Starting HTTP server on {}...", addr);
