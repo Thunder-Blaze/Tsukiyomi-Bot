@@ -9,6 +9,9 @@ use serenity::prelude::*;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use warp::Filter;
+use tokio_cron_scheduler::{Job, JobScheduler};
+use reqwest;
+use std::env;
 
 type PresenceMap = Arc<DashMap<u64, OnlineStatus>>;
 
@@ -58,10 +61,9 @@ async fn main() {
     dotenv().ok();
     let token = std::env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in the environment");
 
-    let port: u16 = std::env::var("PORT")
-        .unwrap_or_else(|_| "10000".to_string())
-        .parse()
-        .expect("PORT must be a valid u16");
+    let port_env = env::var("PORT").expect("PORT must be set");
+    let port: u16 = port_env.parse().expect("PORT must be a valid u16");
+    println!("Render-provided PORT env var: '{}', parsed as {}", port_env, port);
 
     let presence_map: PresenceMap = Arc::new(DashMap::new());
     let handler = Handler {
@@ -129,6 +131,40 @@ async fn main() {
         .event_handler(handler)
         .await
         .expect("Error creating client");
+
+    // Create and start the cron scheduler for self-pinging
+    let sched = JobScheduler::new().await.unwrap();
+
+    let public_url = env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://localhost:{}", port));
+    let ping_url = format!("{}/", public_url);
+
+    sched
+        .add(
+            Job::new_async("0 */5 * * * *", move |_uuid, _l| {
+                let ping_url = ping_url.clone();
+                Box::pin(async move {
+                    println!("Self-pinging to keep alive at: {}", ping_url);
+                    match reqwest::get(&ping_url).await {
+                        Ok(resp) => {
+                            let status = resp.status();
+                            if status.is_success() {
+                                println!("Ping OK: status {}", status);
+                            } else {
+                                println!("Ping received non-OK status: {}", status);
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("Error during self-ping: {:?}", e);
+                        }
+                    }
+                })
+            })
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    sched.start().await.unwrap();
 
     let bot_handle = tokio::spawn(async move {
         if let Err(why) = serenity_client.start().await {
