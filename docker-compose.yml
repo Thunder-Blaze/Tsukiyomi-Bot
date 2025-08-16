@@ -3,8 +3,8 @@ services:
     build: .
     container_name: tsukiyomi-bot
     ports:
-      - "10000:10000"
+      - "${PORT}:${PORT}"
     environment:
-      - PORT=10000
+      - PORT=${PORT}
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     restart: unless-stopped

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: tsukiyomi-bot
+    env: rust
+    plan: free  # or starter/pro depending on your needs
+    buildCommand: cargo build --release
+    startCommand: ./target/release/tsukiyomi-bot
+    autoDeploy: true
+
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: RUST_LOG
+        value: info
+      - key: PUBLIC_URL
+        value: https://tsukiyomi-bot.onrender.com/
+
+    healthCheckPath: /
+    healthCheckTimeout: 100

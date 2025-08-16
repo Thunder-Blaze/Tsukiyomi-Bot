@@ -16,10 +16,10 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates
 
 # Copy the statically-built bot binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/Tsukiyomi-Bot /app/Tsukiyomi-Bot
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/tsukiyomi-bot /app/tsukiyomi-bot
 
 EXPOSE 10000
 
 ENV PORT=10000
 
-CMD ["./Tsukiyomi-Bot"]
+CMD ["./tsukiyomi-bot"]
