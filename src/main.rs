@@ -1,14 +1,14 @@
-use std::sync::Arc;
+use dashmap::DashMap;
+use dotenv::dotenv;
 use serenity::async_trait;
 use serenity::model::{
     gateway::{GatewayIntents, Presence, Ready},
     user::OnlineStatus,
 };
 use serenity::prelude::*;
-use dashmap::DashMap;
-use warp::Filter;
-use dotenv::dotenv;
+use std::sync::Arc;
 use tokio::sync::oneshot;
+use warp::Filter;
 
 type PresenceMap = Arc<DashMap<u64, OnlineStatus>>;
 
@@ -73,26 +73,26 @@ async fn main() {
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS;
 
-    let health_check = warp::path::end()
-        .and(warp::get())
-        .map(|| {
-            println!("[HTTP GET /] Health check OK");
-            warp::reply::with_status("OK", warp::http::StatusCode::OK)
-        });
+    let health_check = warp::path::end().and(warp::get()).map(|| {
+        println!("[HTTP GET /] Health check OK");
+        warp::reply::with_status("OK", warp::http::StatusCode::OK)
+    });
 
     let http_presence_map = Arc::clone(&presence_map);
     let all_presences = {
         let presences = Arc::clone(&http_presence_map);
-        warp::path!("presences")
-            .and(warp::get())
-            .map(move || {
-                let data: Vec<_> = presences
-                    .iter()
-                    .map(|entry| (entry.key().to_string(), format!("{:?}", entry.value())))
-                    .collect();
-                println!("[HTTP GET /presences] returning {} entries: {:?}", data.len(), data);
-                warp::reply::json(&data)
-            })
+        warp::path!("presences").and(warp::get()).map(move || {
+            let data: Vec<_> = presences
+                .iter()
+                .map(|entry| (entry.key().to_string(), format!("{:?}", entry.value())))
+                .collect();
+            println!(
+                "[HTTP GET /presences] returning {} entries: {:?}",
+                data.len(),
+                data
+            );
+            warp::reply::json(&data)
+        })
     };
 
     let presence_by_id = warp::path!("presences" / u64)
@@ -100,17 +100,14 @@ async fn main() {
         .and(warp::any().map(move || Arc::clone(&http_presence_map)))
         .map(|user_id: u64, presences: PresenceMap| {
             if let Some(status) = presences.get(&user_id) {
-                println!("[HTTP GET /presences/{}] found status {:?}", user_id, status);
-                warp::reply::with_status(
-                    format!("{:?}", *status),
-                    warp::http::StatusCode::OK,
-                )
+                println!(
+                    "[HTTP GET /presences/{}] found status {:?}",
+                    user_id, status
+                );
+                warp::reply::with_status(format!("{:?}", *status), warp::http::StatusCode::OK)
             } else {
                 println!("[HTTP GET /presences/{}] not found", user_id);
-                warp::reply::with_status(
-                    "Not found".to_string(),
-                    warp::http::StatusCode::NOT_FOUND,
-                )
+                warp::reply::with_status("Not found".to_string(), warp::http::StatusCode::NOT_FOUND)
             }
         });
 
@@ -119,8 +116,8 @@ async fn main() {
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
     // Start the HTTP server first and bind to $PORT
-    let (addr, server_future) = warp::serve(routes)
-        .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async {
+    let (addr, server_future) =
+        warp::serve(routes).bind_with_graceful_shutdown(([0, 0, 0, 0], port), async {
             shutdown_rx.await.ok();
         });
 
