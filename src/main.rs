@@ -57,6 +57,7 @@ impl EventHandler for Handler {
 async fn main() {
     dotenv().ok();
     let token = std::env::var("DISCORD_TOKEN").expect("Expected DISCORD_TOKEN in the environment");
+
     let port: u16 = std::env::var("PORT")
         .unwrap_or_else(|_| "10000".to_string())
         .parse()
@@ -72,19 +73,14 @@ async fn main() {
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS;
 
-    let mut client = serenity::Client::builder(token, intents)
-        .event_handler(handler)
-        .await
-        .expect("Error creating client");
-
-    let http_presence_map = Arc::clone(&presence_map);
-
     let health_check = warp::path::end()
         .and(warp::get())
         .map(|| {
             println!("[HTTP GET /] Health check OK");
             warp::reply::with_status("OK", warp::http::StatusCode::OK)
         });
+
+    let http_presence_map = Arc::clone(&presence_map);
     let all_presences = {
         let presences = Arc::clone(&http_presence_map);
         warp::path!("presences")
@@ -98,6 +94,7 @@ async fn main() {
                 warp::reply::json(&data)
             })
     };
+
     let presence_by_id = warp::path!("presences" / u64)
         .and(warp::get())
         .and(warp::any().map(move || Arc::clone(&http_presence_map)))
@@ -118,29 +115,45 @@ async fn main() {
         });
 
     let routes = health_check.or(all_presences).or(presence_by_id);
+
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-    let (addr, server) = warp::serve(routes)
+
+    // Start the HTTP server first and bind to $PORT
+    let (addr, server_future) = warp::serve(routes)
         .bind_with_graceful_shutdown(([0, 0, 0, 0], port), async {
             shutdown_rx.await.ok();
         });
-    println!("Starting HTTP server on {}...", addr);
-    let warp_handle = tokio::spawn(server);
 
-    // Spawn the client in a background task
-    let client_handle = tokio::spawn(async move {
-        if let Err(why) = client.start().await {
+    println!("Starting HTTP server on {}...", addr);
+
+    // Spawn the serenity bot in the background so it does not block the HTTP server
+    let serenity_token = token.clone();
+    let mut serenity_client = serenity::Client::builder(serenity_token, intents)
+        .event_handler(handler)
+        .await
+        .expect("Error creating client");
+
+    let bot_handle = tokio::spawn(async move {
+        if let Err(why) = serenity_client.start().await {
             println!("Client error: {:?}", why);
         }
     });
 
-    tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl_c");
-    println!("Shutdown signal received, stopping...");
+    // Now keep both futures running using tokio::select!
+    tokio::select! {
+        _ = server_future => {
+            // The HTTP server finished (shutdown triggered)
+            println!("HTTP server stopped.");
+        }
+        _ = tokio::signal::ctrl_c() => {
+            // Ctrl+C was pressed, trigger shutdown for HTTP server
+            println!("Shutdown signal received, stopping...");
+            let _ = shutdown_tx.send(());
+        }
+    }
 
-    let _ = shutdown_tx.send(());
-    let _ = warp_handle.await;
-    
-    // Shutdown shards gracefully
-    client_handle.abort(); // Abort client task on shutdown
+    // Once either future ends, abort the serenity bot task if it has not exited
+    bot_handle.abort();
 
     println!("Shutdown complete.");
 }
