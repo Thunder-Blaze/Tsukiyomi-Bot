@@ -95,7 +95,7 @@ async fn main() {
                 warp::reply::with_status(format!("{:?}", *status), warp::http::StatusCode::OK)
             } else {
                 println!("[HTTP GET /presences/{}] not found", user_id);
-                warp::reply::with_status("Not found".to_string(), warp::http::StatusCode::NOT_FOUND)
+                warp::reply::with_status("NotFound".to_string(), warp::http::StatusCode::OK)
             }
         });
 
