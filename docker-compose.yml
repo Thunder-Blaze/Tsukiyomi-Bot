@@ -1,0 +1,10 @@
+services:
+  tsukiyomi-bot:
+    build: .
+    container_name: tsukiyomi-bot
+    ports:
+      - "10000:10000"
+    environment:
+      - PORT=10000
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+    restart: unless-stopped
