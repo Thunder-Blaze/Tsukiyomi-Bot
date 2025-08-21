@@ -9,7 +9,6 @@ use serenity::prelude::*;
 use std::sync::Arc;
 use tokio::sync::oneshot;
 use warp::Filter;
-use tokio_cron_scheduler::{Job, JobScheduler};
 use reqwest;
 use std::env;
 
@@ -123,37 +122,6 @@ async fn main() {
             println!("Client error: {:?}", why);
         }
     });
-
-    // Start cron self-pinger
-    let sched = JobScheduler::new().await.unwrap();
-    let public_url = env::var("PUBLIC_URL").unwrap_or_else(|_| format!("http://localhost:{}", port));
-    let ping_url = format!("{}/", public_url);
-
-    sched
-        .add(Job::new_async("0 */5 * * * *", move |_uuid, _l| {
-            let ping_url = ping_url.clone();
-            Box::pin(async move {
-                println!("Self-pinging to keep alive at: {}", ping_url);
-                match reqwest::get(&ping_url).await {
-                    Ok(resp) => {
-                        let status = resp.status();
-                        if status.is_success() {
-                            println!("Ping OK: status {}", status);
-                        } else {
-                            println!("Ping received non-OK status: {}", status);
-                        }
-                    }
-                    Err(e) => {
-                        eprintln!("Error during self-ping: {:?}", e);
-                    }
-                }
-            })
-        })
-        .unwrap())
-        .await
-        .unwrap();
-
-    sched.start().await.unwrap();
 
     // Await the warp HTTP server in the foreground (critical for Render)
     server_future.await;
