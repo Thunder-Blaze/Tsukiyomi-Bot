@@ -8,8 +8,6 @@ use serenity::model::{
 use serenity::prelude::*;
 use std::sync::Arc;
 use tokio::sync::oneshot;
-use warp::Filter;
-use reqwest;
 use std::env;
 
 type PresenceMap = Arc<DashMap<u64, OnlineStatus>>;
