@@ -63,9 +63,14 @@ async fn main() {
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS;
 
-    let health_check = warp::path::end().and(warp::get()).map(|| {
-        println!("[HTTP GET /] Health check OK");
-        warp::reply::with_status("OK", warp::http::StatusCode::OK)
+    let health_check = warp::path::end()
+    .and(warp::method())
+    .and_then(|method: warp::http::Method| async move {
+        if method == warp::http::Method::HEAD || method == warp::http::Method::GET {
+            Ok::<_, warp::Rejection>(warp::reply::with_status("OK", warp::http::StatusCode::OK))
+        } else {
+            Err(warp::reject::not_found())
+        }
     });
 
     let http_presence_map = Arc::clone(&presence_map);
