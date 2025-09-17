@@ -16,17 +16,15 @@ impl DatabaseOperations {
         Self { pool }
     }
 
-    /// Get user presence by user and guild ID
+    /// Get user presence by user ID
     pub async fn get_user_presence(
         &self, 
-        user_id: u64, 
-        guild_id: u64
+        user_id: u64
     ) -> Result<Option<UserPresence>> {
         let presence = sqlx::query_as::<_, UserPresence>(
-            "SELECT * FROM user_presences WHERE user_id = $1 AND guild_id = $2"
+            "SELECT * FROM user_presences WHERE user_id = $1"
         )
         .bind(user_id as i64)
-        .bind(guild_id as i64)
         .fetch_optional(&self.pool)
         .await?;
 
@@ -37,37 +35,29 @@ impl DatabaseOperations {
     pub async fn upsert_presence(
         &self,
         user_id: u64,
-        guild_id: u64,
         status: &OnlineStatus,
-        activity_name: Option<String>,
-        activity_type: Option<String>,
     ) -> Result<UserPresence> {
         let status_str = status_to_string(status);
         
         let presence = sqlx::query_as::<_, UserPresence>(
             r#"
             INSERT INTO user_presences 
-                (user_id, guild_id, status, activity_name, activity_type, last_seen_at, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW(), NOW(), NOW())
-            ON CONFLICT (user_id, guild_id)
+                (user_id, status, last_seen_at, created_at, updated_at)
+            VALUES ($1, $2, NOW(), NOW(), NOW())
+            ON CONFLICT (user_id)
             DO UPDATE SET 
-                status = $3,
-                activity_name = $4,
-                activity_type = $5,
+                status = $2,
                 last_seen_at = NOW(),
                 updated_at = NOW()
             RETURNING *
             "#
         )
         .bind(user_id as i64)
-        .bind(guild_id as i64)
         .bind(&status_str)
-        .bind(activity_name)
-        .bind(activity_type)
         .fetch_one(&self.pool)
         .await?;
 
-        info!("Upserted presence: user_id={}, guild_id={}, status={:?}", user_id, guild_id, status);
+        info!("Upserted presence: user_id={}, status={:?}", user_id, status);
         Ok(presence)
     }
 
@@ -90,18 +80,6 @@ impl DatabaseOperations {
         let presences = sqlx::query_as::<_, UserPresence>(&query)
             .fetch_all(&self.pool)
             .await?;
-
-        Ok(presences)
-    }
-
-    /// Get presences by guild ID
-    pub async fn get_guild_presences(&self, guild_id: u64) -> Result<Vec<UserPresence>> {
-        let presences = sqlx::query_as::<_, UserPresence>(
-            "SELECT * FROM user_presences WHERE guild_id = $1 ORDER BY updated_at DESC"
-        )
-        .bind(guild_id as i64)
-        .fetch_all(&self.pool)
-        .await?;
 
         Ok(presences)
     }

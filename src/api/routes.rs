@@ -33,10 +33,7 @@ pub fn create_routes(
                             .iter()
                             .map(|p| serde_json::json!({
                                 "user_id": p.user_id.to_string(),
-                                "guild_id": p.guild_id.to_string(),
                                 "status": p.status,
-                                "activity_name": p.activity_name,
-                                "activity_type": p.activity_type,
                                 "last_seen_at": p.last_seen_at,
                                 "updated_at": p.updated_at
                             }))
@@ -60,7 +57,7 @@ pub fn create_routes(
             let app_state = app_state_clone2.clone();
             async move {
                 // Try Redis cache first, then database
-                match app_state.redis.get_cached_presence(user_id, 1).await {
+                match app_state.redis.get_cached_presence(user_id).await {
                     Ok(Some(presence)) => {
                         println!("[HTTP GET /presences/{}] found in cache", user_id);
                         Ok::<_, warp::Rejection>(warp::reply::with_status(
@@ -70,11 +67,11 @@ pub fn create_routes(
                     }
                     _ => {
                         // Try database
-                        match app_state.db.get_user_presence(user_id, 1).await {
+                        match app_state.db.get_user_presence(user_id).await {
                             Ok(Some(presence)) => {
                                 println!("[HTTP GET /presences/{}] found in database", user_id);
                                 // Cache for next time
-                                let _ = app_state.redis.cache_presence(user_id, 1, &presence).await;
+                                let _ = app_state.redis.cache_presence(user_id, &presence).await;
                                 Ok::<_, warp::Rejection>(warp::reply::with_status(
                                     format!("{:?}", presence.status), 
                                     warp::http::StatusCode::OK

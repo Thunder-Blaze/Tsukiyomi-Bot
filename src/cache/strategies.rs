@@ -23,18 +23,18 @@ impl PresenceCache {
     }
 
     /// Get presence using cache-aside pattern
-    pub async fn get_presence(&self, user_id: u64, guild_id: u64) -> Result<Option<UserPresence>> {
+    pub async fn get_presence(&self, user_id: u64) -> Result<Option<UserPresence>> {
         match self.strategy {
             CacheStrategy::CacheAside => {
                 // Try cache first
-                if let Some(presence) = self.redis.get_cached_presence(user_id, guild_id).await? {
+                if let Some(presence) = self.redis.get_cached_presence(user_id).await? {
                     return Ok(Some(presence));
                 }
 
                 // Fallback to database
-                if let Some(presence) = self.db.get_user_presence(user_id, guild_id).await? {
+                if let Some(presence) = self.db.get_user_presence(user_id).await? {
                     // Cache the result
-                    self.redis.cache_presence(user_id, guild_id, &presence).await?;
+                    self.redis.cache_presence(user_id, &presence).await?;
                     Ok(Some(presence))
                 } else {
                     Ok(None)
@@ -42,7 +42,7 @@ impl PresenceCache {
             }
             _ => {
                 // For other strategies, implement as needed
-                self.db.get_user_presence(user_id, guild_id).await
+                self.db.get_user_presence(user_id).await
             }
         }
     }
@@ -50,18 +50,17 @@ impl PresenceCache {
     /// Set presence using selected strategy
     pub async fn set_presence(&self, presence: &UserPresence) -> Result<()> {
         let user_id = presence.user_id as u64;
-        let guild_id = presence.guild_id as u64;
 
         match self.strategy {
             CacheStrategy::WriteThrough => {
                 // Write to both cache and database
-                self.redis.cache_presence(user_id, guild_id, presence).await?;
+                self.redis.cache_presence(user_id, presence).await?;
                 // Database write would be handled by the calling code
                 Ok(())
             }
             _ => {
                 // Cache after database write
-                self.redis.cache_presence(user_id, guild_id, presence).await
+                self.redis.cache_presence(user_id, presence).await
             }
         }
     }

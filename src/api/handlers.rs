@@ -46,19 +46,19 @@ pub async fn get_presence_by_id_handler(
     app_state: AppState,
 ) -> Result<impl Reply, Rejection> {
     // Try cache first
-    match app_state.redis.get_cached_presence(user_id, guild_id).await {
+    match app_state.redis.get_cached_presence(user_id).await {
         Ok(Some(presence)) => {
-            info!("[HTTP GET /presences/{}/{}] found in cache", user_id, guild_id);
+            info!("[HTTP GET /presences/{}] found in cache", user_id);
             return Ok(warp::reply::json(&PresenceResponse::from(presence)));
         }
         Ok(None) => {
             // Try database
-            match app_state.db.get_user_presence(user_id, guild_id).await {
+            match app_state.db.get_user_presence(user_id).await {
                 Ok(Some(presence)) => {
-                    info!("[HTTP GET /presences/{}/{}] found in database", user_id, guild_id);
+                    info!("[HTTP GET /presences/{}] found in database", user_id);
                     
                     // Cache for next time
-                    if let Err(e) = app_state.redis.cache_presence(user_id, guild_id, &presence).await {
+                    if let Err(e) = app_state.redis.cache_presence(user_id, &presence).await {
                         error!("Failed to cache presence: {}", e);
                     }
                     
@@ -77,33 +77,11 @@ pub async fn get_presence_by_id_handler(
         Err(e) => {
             error!("Cache error: {}", e);
             // Continue to database on cache error
-            match app_state.db.get_user_presence(user_id, guild_id).await {
+            match app_state.db.get_user_presence(user_id).await {
                 Ok(Some(presence)) => Ok(warp::reply::json(&PresenceResponse::from(presence))),
                 Ok(None) => Err(warp::reject::custom(ApiError::NotFound)),
                 Err(e) => Err(warp::reject::custom(ApiError::DatabaseError(e.to_string()))),
             }
-        }
-    }
-}
-
-/// Get guild presences handler
-pub async fn get_guild_presences_handler(
-    guild_id: u64,
-    app_state: AppState,
-) -> Result<impl Reply, Rejection> {
-    match app_state.db.get_guild_presences(guild_id).await {
-        Ok(presences) => {
-            let responses: Vec<PresenceResponse> = presences
-                .into_iter()
-                .map(PresenceResponse::from)
-                .collect();
-            
-            info!("[HTTP GET /guilds/{}/presences] returning {} entries", guild_id, responses.len());
-            Ok(warp::reply::json(&responses))
-        }
-        Err(e) => {
-            error!("Database error: {}", e);
-            Err(warp::reject::custom(ApiError::DatabaseError(e.to_string())))
         }
     }
 }

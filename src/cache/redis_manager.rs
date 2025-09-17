@@ -44,8 +44,8 @@ impl RedisManager {
     }
 
     /// Cache user presence
-    pub async fn cache_presence(&self, user_id: u64, guild_id: u64, presence: &UserPresence) -> Result<()> {
-        let key = format!("presence:{}:{}", user_id, guild_id);
+    pub async fn cache_presence(&self, user_id: u64, presence: &UserPresence) -> Result<()> {
+        let key = format!("presence:{}", user_id);
         let data = serde_json::to_string(presence)?;
         
         let mut conn = self.get_connection().await?;
@@ -57,8 +57,8 @@ impl RedisManager {
     }
 
     /// Get cached presence
-    pub async fn get_cached_presence(&self, user_id: u64, guild_id: u64) -> Result<Option<UserPresence>> {
-        let key = format!("presence:{}:{}", user_id, guild_id);
+    pub async fn get_cached_presence(&self, user_id: u64) -> Result<Option<UserPresence>> {
+        let key = format!("presence:{}", user_id);
         
         let mut conn = self.get_connection().await?;
         // Use redis::Value to handle nil responses properly
@@ -87,8 +87,8 @@ impl RedisManager {
     }
 
     /// Invalidate presence cache
-    pub async fn invalidate_presence(&self, user_id: u64, guild_id: u64) -> Result<()> {
-        let key = format!("presence:{}:{}", user_id, guild_id);
+    pub async fn invalidate_presence(&self, user_id: u64) -> Result<()> {
+        let key = format!("presence:{}", user_id);
         
         let mut conn = self.get_connection().await?;
         // Use proper error handling instead of unwrap_or

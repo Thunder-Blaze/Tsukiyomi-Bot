@@ -1,6 +1,5 @@
 # Target directory (build artifacts)
 target/
-Cargo.lock
 
 # Git files
 .git/

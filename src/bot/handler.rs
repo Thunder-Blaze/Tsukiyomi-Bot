@@ -30,29 +30,25 @@ impl EventHandler for BotHandler {
         // Extract presence data first to avoid Send issues
         let mut presence_data = Vec::new();
         for guild_id in ctx.cache.guilds() {
-            let guild_id_u64 = guild_id.get();
             if let Some(guild_data) = ctx.cache.guild(guild_id) {
                 for (user_id, presence) in &guild_data.presences {
                     let user_id = user_id.get();
                     let status = presence.status;
-                    presence_data.push((user_id, guild_id_u64, status));
+                    presence_data.push((user_id, status));
                 }
             }
         }
         
         // Now process the extracted data
-        for (user_id, guild_id_u64, status) in presence_data {
+        for (user_id, status) in presence_data {
             // Save to database instead of DashMap
             match self.app_state.db.upsert_presence(
                 user_id, 
-                guild_id_u64, 
                 &status,
-                None, // activity_name
-                None, // activity_type
             ).await {
                 Ok(presence_record) => {
                     // Cache in Redis for fast access
-                    if let Err(e) = self.app_state.redis.cache_presence(user_id, guild_id_u64, &presence_record).await {
+                    if let Err(e) = self.app_state.redis.cache_presence(user_id, &presence_record).await {
                         tracing::error!("Failed to cache presence: {}", e);
                     }
                     total_presences += 1;
@@ -75,17 +71,13 @@ impl EventHandler for BotHandler {
         let new_status = new_data.status;
         
         info!("Received presence_update: user_id = {}, status = {:?}", user_id, new_status);
-        
-        // Since we don't have guild_id from presence data, we'll need to get it from the first guild
-        // In a production bot, you'd want to handle multiple guilds properly
-        let guild_id = 1; // Default guild ID or extract from context
-        
+                
         // Get old status from Redis first, then database if not found
-        let old_status = match self.app_state.redis.get_cached_presence(user_id, guild_id).await {
+        let old_status = match self.app_state.redis.get_cached_presence(user_id).await {
             Ok(Some(presence)) => Some(presence.status),
             _ => {
                 // Try database if not in cache
-                match self.app_state.db.get_user_presence(user_id, guild_id).await {
+                match self.app_state.db.get_user_presence(user_id).await {
                     Ok(Some(presence)) => Some(presence.status),
                     _ => None
                 }
@@ -95,14 +87,11 @@ impl EventHandler for BotHandler {
         // Save to database
         match self.app_state.db.upsert_presence(
             user_id, 
-            guild_id, 
             &new_status,
-            None, // Could extract from new_data.activities
-            None, // activity_type (now String)
         ).await {
             Ok(presence_record) => {
                 // Cache in Redis
-                if let Err(e) = self.app_state.redis.cache_presence(user_id, guild_id, &presence_record).await {
+                if let Err(e) = self.app_state.redis.cache_presence(user_id, &presence_record).await {
                     tracing::error!("Failed to cache updated presence: {}", e);
                 }
                 
