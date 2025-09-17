@@ -35,3 +35,6 @@ services:
     name: tsukiyomi-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: Allow all connections (internal Render services)
