@@ -8,10 +8,13 @@ ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 WORKDIR /app
 
 # Copy dependency files first for better caching
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
+
+# Generate initial Cargo.lock by running cargo fetch
+RUN cargo fetch
 
 # Pre-compile dependencies (this layer will be cached unless dependencies change)
 RUN cargo build --release && rm -rf src target/x86_64-unknown-linux-musl/release/deps/tsukiyomi*
