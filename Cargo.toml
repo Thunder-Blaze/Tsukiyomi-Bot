@@ -1,12 +1,200 @@
 [package]
 name = "tsukiyomi-bot"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-serenity = { version = "0.12", features = ["gateway", "client", "model", "rustls_backend"] }
-tokio = { version = "1", features = ["rt-multi-thread", "signal", "macros"] }
-warp = "0.3"
-dashmap = "5.4"
+# Core async runtime - essential for all async operations
+tokio = { version = "1.41", features = [
+    "full",           # All tokio features for production use
+    "tracing",        # Integration with tracing
+    "parking_lot",    # Faster mutexes
+] }
+
+# Discord API client - updated to latest
+serenity = { version = "0.12.4", features = [
+    "client",         # Discord client
+    "gateway",        # Gateway connection
+    "model",          # Discord data models
+    "cache",          # In-memory cache
+    "framework",      # Command framework (optional, for future commands)
+    "standard_framework", # Standard command framework
+    "voice",          # Voice support (optional)
+    "collector",      # Event collectors
+    "unstable_discord_api", # Access to beta Discord features
+] }
+
+# Database - PostgreSQL with compile-time checked queries
+sqlx = { version = "0.8.6", features = [
+    "runtime-tokio-rustls",  # Tokio async runtime with rustls TLS
+    "postgres",              # PostgreSQL support
+    "uuid",                  # UUID support
+    "chrono",               # Date/time handling
+    "json",                 # JSON support
+    "macros",               # Compile-time SQL checking
+    "migrate",              # Database migrations
+] }
+
+# Connection pool for Redis - latest compatible versions
+mobc = "0.9.0"
+mobc-redis = "0.9.0"
+
+# HTTP web framework - updated to latest warp
+warp = { version = "0.3.7", features = [
+    "tls",           # TLS support
+    "compression",   # Response compression
+] }
+
+# Concurrent data structures - updated to latest
+dashmap = "6.1.0"  # Thread-safe HashMap
+
+# Configuration and environment - updated
 dotenv = "0.15.0"
 
+# Serialization - latest versions
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
+
+# Date and time handling - updated
+chrono = { version = "0.4.38", features = ["serde"] }
+
+# UUID generation - latest
+uuid = { version = "1.11.0", features = ["v4", "serde", "fast-rng"] }
+
+# Logging and tracing - updated to latest
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.18", features = [
+    "env-filter",    # Environment-based log filtering
+    "json",          # JSON log output
+    "chrono",        # Timestamp formatting
+    "ansi",          # Colored output
+    "tracing",       # Tracing integration
+] }
+
+# Error handling - latest versions
+anyhow = "1.0.93"          # Flexible error handling
+thiserror = "1.0.69"       # Custom error types
+
+# Async utilities - latest
+futures = "0.3.31"
+futures-util = "0.3.31"
+
+# Rate limiting - updated
+governor = "0.6.3"
+
+# Additional utilities - latest versions
+once_cell = "1.20.2"      # Global static initialization
+parking_lot = "0.12.3"    # Fast synchronization primitives
+
+[dev-dependencies]
+# Testing dependencies - updated to latest
+tokio-test = "0.4.4"
+mockall = "0.13.0"
+tempfile = "3.13.0"
+serial_test = "3.1.1"     # Sequential test execution
+
+# HTTP client for integration tests - updated
+reqwest = { version = "0.12.9", features = ["json"] }
+
+# Test utilities - latest
+pretty_assertions = "1.4.1"
+
+[build-dependencies]
+# Build-time dependencies if needed
+# None required for this project currently
+
+# Profile configurations for different build types
+[profile.dev]
+# Development profile - fast compilation, debug info
+opt-level = 0           # No optimization
+debug = true           # Full debug info
+debug-assertions = true # Enable debug assertions
+overflow-checks = true  # Check for integer overflow
+lto = false           # No link-time optimization
+panic = 'unwind'      # Unwind on panic for better debugging
+incremental = true    # Incremental compilation
+codegen-units = 256   # Parallel codegen for faster compilation
+
+[profile.release]
+# Production profile - maximum performance
+opt-level = 3         # Maximum optimization
+debug = false         # No debug info in release
+debug-assertions = false # Disable debug assertions
+overflow-checks = false  # Disable overflow checks for performance
+lto = "thin"         # Thin link-time optimization (good balance)
+panic = 'abort'      # Abort on panic (smaller binary)
+incremental = false  # Disable incremental compilation
+codegen-units = 1    # Single codegen unit for better optimization
+strip = true         # Strip symbols from binary
+
+[profile.release-with-debug]
+# Release profile but with debug symbols (for production debugging)
+inherits = "release"
+debug = true
+strip = false
+
+[profile.bench]
+# Benchmarking profile
+inherits = "release"
+debug = true          # Keep debug info for profilers
+lto = "thin"         # Balance between performance and compile time
+
+[profile.test]
+# Test profile
+opt-level = 1        # Some optimization for faster tests
+debug = true         # Keep debug info for test failures
+
+# Workspace configuration (if you plan to split into multiple crates)
+[workspace]
+resolver = "2"
+members = [
+    ".",
+    # Future crates like:
+    # "crates/database",
+    # "crates/cache", 
+    # "crates/api",
+]
+
+# Feature flags for optional functionality
+[features]
+default = ["postgres", "redis-cache"]
+
+# Database backends
+postgres = []
+mysql = ["sqlx/mysql"]
+sqlite = ["sqlx/sqlite"]
+
+# Caching backends
+redis-cache = []
+memcached = []
+
+# Patch section for version overrides if needed
+[patch.crates-io]
+# Example: Use a specific version or fork of a dependency
+# serenity = { git = "https://github.com/serenity-rs/serenity", branch = "current" }
+
+
+# Example configurations for different deployment targets
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific optimizations
+jemalloc = { version = "0.2.1", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+# Windows-specific dependencies
+winapi = { version = "0.3", features = ["winuser"] }
+
+# Documentation configuration
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+# Cargo-audit configuration for security scanning
+[package.metadata.audit]
+ignore = []  # CVE IDs to ignore (use sparingly)
+
+# Release configuration
+[package.metadata.release]
+sign-commit = true
+sign-tag = true
+pre-release-commit-message = "Release {{version}}"
+tag-message = "Release {{version}}"

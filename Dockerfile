@@ -1,25 +1,63 @@
-# --- Build Stage ---
-FROM clux/muslrust:stable AS builder
+# Multi-stage build for optimized production image
+FROM rust:1.82 as builder
 
+# Create app directory
 WORKDIR /app
-COPY . .
 
-# Build the bot as a static binary
+# Install required system dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy manifest files first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy main.rs to build dependencies
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release && rm -rf src
+
+# Copy source code
+COPY src ./src
+COPY migrations ./migrations
+
+# Build the application in release mode
 RUN cargo build --release
 
-# --- Minimal Runtime Stage ---
-FROM alpine:3.20
+# Runtime stage with minimal base image
+FROM debian:bookworm-slim
 
-WORKDIR /app
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
-# Install ca-certificates (for HTTPS), remove temp
-RUN apk add --no-cache ca-certificates
+# Create non-root user for security
+RUN useradd -r -s /bin/false -m tsukiyomi
 
-# Copy the statically-built bot binary
-COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/tsukiyomi-bot /app/tsukiyomi-bot
+# Copy the binary from builder stage
+COPY --from=builder /app/target/release/tsukiyomi-bot /usr/local/bin/tsukiyomi-bot
 
-EXPOSE 10000
+# Set ownership and permissions
+RUN chown tsukiyomi:tsukiyomi /usr/local/bin/tsukiyomi-bot \
+    && chmod +x /usr/local/bin/tsukiyomi-bot
 
-ENV PORT=10000
+# Switch to non-root user
+USER tsukiyomi
 
-CMD ["./tsukiyomi-bot"]
+# Expose the port (will be overridden by $PORT env var)
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8080}/ || exit 1
+
+# Set default environment
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=1
+
+# Run the binary
+CMD ["tsukiyomi-bot"]
