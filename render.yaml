@@ -26,13 +26,10 @@ services:
         value: "16"
       - key: REDIS_POOL_MAX_IDLE
         value: "8"
-      - key: RUST_LOG
-        value: info
-      - key: RUST_BACKTRACE
-        value: "1"
-
-    healthCheckPath: /health
-    healthCheckTimeout: 100
+      # - key: RUST_LOG
+      #   value: info
+      # - key: RUST_BACKTRACE
+      #   value: "1"
     
   - type: redis
     name: tsukiyomi-redis
