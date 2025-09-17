@@ -39,8 +39,8 @@ pub fn status_to_string(status: &OnlineStatus) -> String {
     match status {
         OnlineStatus::Online => "Online".to_string(),
         OnlineStatus::Idle => "Idle".to_string(),
-        OnlineStatus::DoNotDisturb => "Do Not Disturb".to_string(),
-        OnlineStatus::Invisible => "Invisible".to_string(),
+        OnlineStatus::DoNotDisturb => "DoNotDisturb".to_string(),
+        OnlineStatus::Invisible => "Offline".to_string(),
         OnlineStatus::Offline => "Offline".to_string(),
         _ => "Offline".to_string(), // Default for unknown statuses
     }

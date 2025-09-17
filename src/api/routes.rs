@@ -61,7 +61,7 @@ pub fn create_routes(
                     Ok(Some(presence)) => {
                         println!("[HTTP GET /presences/{}] found in cache", user_id);
                         Ok::<_, warp::Rejection>(warp::reply::with_status(
-                            format!("{:?}", presence.status), 
+                            presence.status, 
                             warp::http::StatusCode::OK
                         ))
                     }
@@ -73,7 +73,7 @@ pub fn create_routes(
                                 // Cache for next time
                                 let _ = app_state.redis.cache_presence(user_id, &presence).await;
                                 Ok::<_, warp::Rejection>(warp::reply::with_status(
-                                    format!("{:?}", presence.status), 
+                                    presence.status, 
                                     warp::http::StatusCode::OK
                                 ))
                             }
