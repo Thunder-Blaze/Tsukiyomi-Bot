@@ -1,0 +1,62 @@
+# Target directory (build artifacts)
+target/
+Cargo.lock
+
+# Git files
+.git/
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker files (not needed in build context)
+Dockerfile*
+.dockerignore
+docker-compose*.yml
+
+# Environment files (should be set via environment variables)
+.env*
+env.sample
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/
+
+# Node modules (if any)
+node_modules/
+
+# Test files
+tests/
+test/
+
+# CI/CD files
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Backup files
+*.bak
+*.backup
+
+# SQLx offline query data (regenerated during build)
+.sqlx/

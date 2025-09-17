@@ -145,34 +145,6 @@ cargo fmt
 - **Connection Pooling**: Database and Redis connection pools
 - **Async/Await**: Non-blocking I/O throughout
 - **Structured Logging**: Low-overhead tracing
-- **Memory Efficient**: DashMap for concurrent access
-
-## Monitoring
-
-The application provides structured logging and metrics:
-
-- Request/response logging
-- Database query metrics
-- Redis cache hit/miss rates
-- Discord API event counts
-- Error tracking and alerting
-
-## Security
-
-- Environment-based configuration
-- No hardcoded secrets
-- Input validation
-- SQL injection protection (SQLx compile-time checks)
-- Rate limiting support
-
-## Future Roadmap
-
-- [ ] Discord slash commands
-- [ ] Webhook integrations
-- [ ] Metrics and Prometheus support
-- [ ] Clustering support
-- [ ] GraphQL API
-- [ ] WebSocket real-time updates
 
 ## Contributing
 

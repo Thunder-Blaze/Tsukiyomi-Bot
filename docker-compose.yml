@@ -1,4 +1,11 @@
 services:
+  redis:
+    image: redis:latest
+    container_name: tsukiyomi-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
   tsukiyomi-bot:
     build: .
     container_name: tsukiyomi-bot
@@ -6,5 +13,11 @@ services:
       - "${PORT}:${PORT}"
     environment:
       - PORT=${PORT}
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_MAX_CONNECTIONS=20
+      - DB_MIN_CONNECTIONS=5
+      - REDIS_URL=redis://redis:6379
+      - REDIS_POOL_MAX_OPEN=16
+      - REDIS_POOL_MAX_IDLE=8
       - DISCORD_TOKEN=${DISCORD_TOKEN}
     restart: unless-stopped

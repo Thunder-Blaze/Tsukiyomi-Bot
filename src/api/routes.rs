@@ -15,6 +15,11 @@ pub fn create_routes(
             }
         });
 
+    // Dedicated health check endpoint
+    let health_check_route = warp::path("health")
+        .and(warp::get())
+        .map(|| warp::reply::with_status("Healthy", warp::http::StatusCode::OK));
+
     // Get all presences from database
     let app_state_clone1 = app_state.clone();
     let all_presences_route = warp::path!("presences")
@@ -89,15 +94,8 @@ pub fn create_routes(
         });
 
     health_route
+        .or(health_check_route)
         .or(all_presences_route)
         .or(presence_by_id_route)
 }
-
-/// Dependency injection filter for AppState
-fn with_app_state(
-    app_state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || app_state.clone())
-}
-
 

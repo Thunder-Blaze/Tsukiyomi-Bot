@@ -51,15 +51,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Graceful shutdown
     let (_shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    // Start HTTP server
+    // Start HTTP server first for Render port recognition
     let (addr, server_future) = warp::serve(routes)
         .bind_with_graceful_shutdown(([0, 0, 0, 0], config.port), async {
             shutdown_rx.await.ok();
         });
 
-    info!("HTTP server starting on {}", addr);
+    info!("HTTP server bound and ready on {}", addr);
+    
+    // Start the server in background
+    let server_handle = tokio::spawn(server_future);
+    
+    // Give a moment for the server to be fully ready
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+    info!("HTTP server is now listening and ready for connections");
 
-    // Start Discord bot
+    // Start Discord bot after server is ready
     let mut serenity_client = Client::builder(config.discord_token.clone(), intents)
         .event_handler(handler)
         .await?;
@@ -70,11 +77,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
-    // Run HTTP server in foreground
-    server_future.await;
+    info!("Discord bot started successfully");
 
-    // Cleanup
-    bot_handle.abort();
+    // Wait for either server or bot to finish
+    tokio::select! {
+        _ = server_handle => {
+            info!("HTTP server finished");
+        }
+        _ = bot_handle => {
+            info!("Discord bot finished");
+        }
+    }
     info!("Shutdown complete");
     
     Ok(())

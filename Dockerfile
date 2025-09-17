@@ -1,63 +1,53 @@
-# Multi-stage build for optimized production image
-FROM rust:1.82 as builder
+# --- Build Stage ---
+FROM clux/muslrust:stable AS builder
 
-# Create app directory
+# Set build environment for faster builds
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
 WORKDIR /app
 
-# Install required system dependencies
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy manifest files first for better layer caching
+# Copy dependency files first for better caching
 COPY Cargo.toml Cargo.lock ./
 
-# Create dummy main.rs to build dependencies
+# Create a dummy main.rs to build dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
-RUN cargo build --release && rm -rf src
 
-# Copy source code
+# Pre-compile dependencies (this layer will be cached unless dependencies change)
+RUN cargo build --release && rm -rf src target/x86_64-unknown-linux-musl/release/deps/tsukiyomi*
+
+# Copy source code and migrations
 COPY src ./src
 COPY migrations ./migrations
 
-# Build the application in release mode
-RUN cargo build --release
+# Build the actual application with optimizations
+RUN cargo build --release --locked
 
-# Runtime stage with minimal base image
-FROM debian:bookworm-slim
+# --- Minimal Runtime Stage ---
+FROM alpine:3.20
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    libssl3 \
-    curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# Install only essential runtime dependencies
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -g 1000 appuser && \
+    adduser -D -s /bin/sh -u 1000 -G appuser appuser && \
+    rm -rf /var/cache/apk/*
 
-# Create non-root user for security
-RUN useradd -r -s /bin/false -m tsukiyomi
+WORKDIR /app
 
-# Copy the binary from builder stage
-COPY --from=builder /app/target/release/tsukiyomi-bot /usr/local/bin/tsukiyomi-bot
+# Copy the statically-built bot binary with correct ownership
+COPY --from=builder --chown=appuser:appuser /app/target/x86_64-unknown-linux-musl/release/tsukiyomi-bot /app/tsukiyomi-bot
 
-# Set ownership and permissions
-RUN chown tsukiyomi:tsukiyomi /usr/local/bin/tsukiyomi-bot \
-    && chmod +x /usr/local/bin/tsukiyomi-bot
+# Make binary executable
+RUN chmod +x /app/tsukiyomi-bot
 
-# Switch to non-root user
-USER tsukiyomi
+# Switch to non-root user for security
+USER appuser
 
-# Expose the port (will be overridden by $PORT env var)
-EXPOSE 8080
+EXPOSE 10000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-8080}/ || exit 1
+ENV PORT=10000
 
-# Set default environment
-ENV RUST_LOG=info
-ENV RUST_BACKTRACE=1
+# ENV RUST_LOG=info
+# ENV RUST_BACKTRACE=1
 
-# Run the binary
-CMD ["tsukiyomi-bot"]
+CMD ["./tsukiyomi-bot"]
